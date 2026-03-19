@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pixia-airboard:latest
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      AIRBOARD_ADDR: ":8080"
+      AIRBOARD_DB_PATH: /app/data/airboard.db
+      AIRBOARD_APP_URL: ${AIRBOARD_APP_URL:-http://127.0.0.1:8080}
+      AIRBOARD_JWT_SECRET: ${AIRBOARD_JWT_SECRET:-change-me-in-production}
+      AIRBOARD_REDIS_ADDR: redis:6379
+      AIRBOARD_REDIS_PREFIX: ${AIRBOARD_REDIS_PREFIX:-airboard}
+      AIRBOARD_ADMIN_EMAIL: ${AIRBOARD_ADMIN_EMAIL:-admin@example.com}
+      AIRBOARD_ADMIN_PASSWORD: ${AIRBOARD_ADMIN_PASSWORD:-admin123456}
+    volumes:
+      - airboard-data:/app/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  airboard-data:
+  redis-data:

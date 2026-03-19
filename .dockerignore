@@ -1,0 +1,7 @@
+.git
+.github
+airboard
+data
+frontend/node_modules
+frontend/dist
+web/static/spa

@@ -1,0 +1,88 @@
+name: docker-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: pixia1234/pixia-airboard
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: pixia-airboard:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name pixia-airboard-ci \
+            -p 18080:8080 \
+            -e AIRBOARD_APP_URL=http://127.0.0.1:18080 \
+            -e AIRBOARD_JWT_SECRET=ci-secret \
+            pixia-airboard:ci
+
+          trap 'docker logs pixia-airboard-ci; docker rm -f pixia-airboard-ci' EXIT
+
+          curl --retry 20 --retry-delay 1 --retry-connrefused -fsS \
+            http://127.0.0.1:18080/ >/dev/null
+
+          curl --retry 20 --retry-delay 1 --retry-connrefused -fsS \
+            http://127.0.0.1:18080/api/v1/guest/plan/fetch >/dev/null
+
+      - name: Validate publish configuration
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))
+        run: |
+          test -n "${{ secrets.DOCKERHUB_USERNAME }}"
+          test -n "${{ secrets.DOCKERHUB_TOKEN }}"
+
+      - name: Extract Docker metadata
+        id: meta
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish image
+        if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

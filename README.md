@@ -105,6 +105,14 @@
 go run ./cmd/airboard
 ```
 
+如果要重新构建当前仓库内的 React 前端静态资源，可先执行：
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
 默认监听：
 
 ```text
@@ -123,6 +131,47 @@ http://127.0.0.1:8080
 /admin
 ```
 
+## Docker 部署
+
+构建镜像：
+
+```bash
+docker build -t pixia-airboard:local .
+```
+
+直接运行：
+
+```bash
+docker run --rm \
+  -p 8080:8080 \
+  -v airboard-data:/app/data \
+  -e AIRBOARD_APP_URL=http://127.0.0.1:8080 \
+  -e AIRBOARD_JWT_SECRET=change-me \
+  pixia-airboard:local
+```
+
+如果要带上 Redis，一次性启动整套服务：
+
+```bash
+docker compose up -d --build
+```
+
+`compose.yaml` 默认会：
+
+- 启动 `app + redis`
+- 挂载 SQLite 数据卷 `airboard-data`
+- 挂载 Redis 数据卷 `redis-data`
+- 通过 Redis 健康检查避免应用先于缓存启动
+
+生产部署前至少要改：
+
+- `AIRBOARD_JWT_SECRET`
+- `AIRBOARD_APP_URL`
+- `AIRBOARD_ADMIN_EMAIL`
+- `AIRBOARD_ADMIN_PASSWORD`
+
+如果不想启用 Redis，也可以只用上面的单容器 `docker run` 方式。
+
 ## 环境变量
 
 - `AIRBOARD_ADDR`：监听地址，默认 `:8080`
@@ -137,6 +186,40 @@ http://127.0.0.1:8080
 - `AIRBOARD_ADMIN_PATH`：管理路径，默认 `admin`
 - `AIRBOARD_ADMIN_EMAIL`：默认管理员邮箱
 - `AIRBOARD_ADMIN_PASSWORD`：默认管理员密码
+
+## Docker CI
+
+仓库已加入 `.github/workflows/docker-ci.yml`，当前行为是：
+
+- `pull_request`：只构建镜像并做容器冒烟检查
+- 默认分支 `push`：构建并发布 Docker Hub `latest`
+- Git tag `push`，例如 `v1.0.0`：构建并发布版本 tag
+- 手动触发 `workflow_dispatch`：按当前 ref 执行同样逻辑
+
+切到 Docker Hub 后，你需要在 GitHub 仓库里设置：
+
+- Repository Secret `DOCKERHUB_USERNAME`
+  你的 Docker Hub 用户名
+- Repository Secret `DOCKERHUB_TOKEN`
+  Docker Hub Access Token，不要用账号密码
+
+Docker Hub token 获取方式：
+
+1. 登录 Docker Hub
+2. `Account Settings -> Personal access tokens`
+3. 创建一个 token，权限给 `Read, Write, Delete` 或至少 `Read, Write`
+
+当前镜像名已经固定为：
+
+```text
+pixia1234/pixia-airboard
+```
+
+发布结果会是：
+
+- 默认分支：`pixia1234/pixia-airboard:latest`
+- 版本 tag：`pixia1234/pixia-airboard:v1.0.0`
+- 同时带一个 `sha-*` tag
 
 ## 节点对接
 

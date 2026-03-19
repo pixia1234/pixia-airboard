@@ -647,20 +647,21 @@ func (s *Store) ListNotices(ctx context.Context, visibleOnly bool, page, pageSiz
 }
 
 func (s *Store) CreateSession(ctx context.Context, session model.Session) error {
-	if s.cache != nil && s.cache.Enabled() {
-		key := sessionCachePrefix + session.ID
-		if err := s.cache.SetJSON(ctx, key, session, sessionCacheTTL); err != nil {
-			return err
-		}
-		ids, _ := s.cachedSessionIDs(ctx, session.UserID)
-		ids = appendUniqueString(ids, session.ID)
-		return s.cache.SetJSON(ctx, userSessionsCachePrefix+strconv.FormatInt(session.UserID, 10), ids, sessionCacheTTL)
-	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO sessions(id, user_id, ip, ua, login_at)
 		VALUES(?, ?, ?, ?, ?)
 	`, session.ID, session.UserID, session.IP, session.UA, session.LoginAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if s.cache != nil && s.cache.Enabled() {
+		_ = s.cache.SetJSON(ctx, sessionCachePrefix+session.ID, session, sessionCacheTTL)
+		if ids, err := s.cachedSessionIDs(ctx, session.UserID); err == nil && len(ids) > 0 {
+			ids = appendUniqueString(ids, session.ID)
+			_ = s.cache.SetJSON(ctx, userSessionsCachePrefix+strconv.FormatInt(session.UserID, 10), ids, sessionCacheTTL)
+		}
+	}
+	return nil
 }
 
 func (s *Store) SessionByID(ctx context.Context, id string) (model.Session, error) {
@@ -717,69 +718,99 @@ func (s *Store) ListSessionsByUserID(ctx context.Context, userID int64) ([]model
 		}
 		sessions = append(sessions, session)
 	}
-	return sessions, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if s.cache != nil && s.cache.Enabled() {
+		ids := make([]string, 0, len(sessions))
+		for _, session := range sessions {
+			ids = append(ids, session.ID)
+			_ = s.cache.SetJSON(ctx, sessionCachePrefix+session.ID, session, sessionCacheTTL)
+		}
+		_ = s.cache.SetJSON(ctx, userSessionsCachePrefix+strconv.FormatInt(userID, 10), ids, sessionCacheTTL)
+	}
+	return sessions, nil
 }
 
 func (s *Store) DeleteSession(ctx context.Context, id string) error {
+	var userID int64
 	if s.cache != nil && s.cache.Enabled() {
 		session, err := s.SessionByID(ctx, id)
 		if err == nil {
-			ids, _ := s.cachedSessionIDs(ctx, session.UserID)
-			ids = removeString(ids, id)
-			if err := s.cache.SetJSON(ctx, userSessionsCachePrefix+strconv.FormatInt(session.UserID, 10), ids, sessionCacheTTL); err != nil {
-				return err
-			}
+			userID = session.UserID
 		}
-		return s.cache.Delete(ctx, sessionCachePrefix+id)
 	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = ?`, id)
-	return err
+	if err != nil {
+		return err
+	}
+	if s.cache != nil && s.cache.Enabled() {
+		if userID > 0 {
+			if ids, err := s.cachedSessionIDs(ctx, userID); err == nil {
+				ids = removeString(ids, id)
+				_ = s.cache.SetJSON(ctx, userSessionsCachePrefix+strconv.FormatInt(userID, 10), ids, sessionCacheTTL)
+			}
+		}
+		_ = s.cache.Delete(ctx, sessionCachePrefix+id)
+	}
+	return nil
 }
 
 func (s *Store) DeleteSessionsByUserID(ctx context.Context, userID int64) error {
+	ids := make([]string, 0)
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	_, err = s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return err
+	}
 	if s.cache != nil && s.cache.Enabled() {
-		ids, _ := s.cachedSessionIDs(ctx, userID)
 		keys := make([]string, 0, len(ids)+1)
 		keys = append(keys, userSessionsCachePrefix+strconv.FormatInt(userID, 10))
 		for _, id := range ids {
 			keys = append(keys, sessionCachePrefix+id)
 		}
-		return s.cache.Delete(ctx, keys...)
+		_ = s.cache.Delete(ctx, keys...)
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
-	return err
+	return nil
 }
 
 func (s *Store) SaveQuickLogin(ctx context.Context, token model.QuickLogin) error {
-	if s.cache != nil && s.cache.Enabled() {
-		ttl := time.Until(time.Unix(token.ExpiresAt, 0))
-		if ttl < time.Second {
-			ttl = time.Second
-		}
-		return s.cache.SetJSON(ctx, quickLoginCachePrefix+token.Code, token, ttl)
-	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO quick_logins(code, user_id, redirect, expires_at)
 		VALUES(?, ?, ?, ?)
 		ON CONFLICT(code) DO UPDATE SET user_id = excluded.user_id, redirect = excluded.redirect, expires_at = excluded.expires_at
 	`, token.Code, token.UserID, token.Redirect, token.ExpiresAt)
-	return err
+	if err != nil {
+		return err
+	}
+	if s.cache != nil && s.cache.Enabled() {
+		ttl := time.Until(time.Unix(token.ExpiresAt, 0))
+		if ttl < time.Second {
+			ttl = time.Second
+		}
+		_ = s.cache.SetJSON(ctx, quickLoginCachePrefix+token.Code, token, ttl)
+	}
+	return nil
 }
 
 func (s *Store) ConsumeQuickLogin(ctx context.Context, code string) (model.QuickLogin, error) {
-	if s.cache != nil && s.cache.Enabled() {
-		var token model.QuickLogin
-		if err := s.cache.GetJSON(ctx, quickLoginCachePrefix+code, &token); err != nil {
-			if errors.Is(err, cache.ErrCacheMiss) {
-				return model.QuickLogin{}, ErrNotFound
-			}
-			return model.QuickLogin{}, err
-		}
-		if err := s.cache.Delete(ctx, quickLoginCachePrefix+code); err != nil {
-			return model.QuickLogin{}, err
-		}
-		return token, nil
-	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return model.QuickLogin{}, err
@@ -799,6 +830,9 @@ func (s *Store) ConsumeQuickLogin(ctx context.Context, code string) (model.Quick
 	}
 	if err := tx.Commit(); err != nil {
 		return model.QuickLogin{}, err
+	}
+	if s.cache != nil && s.cache.Enabled() {
+		_ = s.cache.Delete(ctx, quickLoginCachePrefix+code)
 	}
 	return token, nil
 }

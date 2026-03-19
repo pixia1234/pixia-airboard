@@ -20,80 +20,22 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request) {
 	settings, _ := s.store.AppSettings(r.Context())
 	adminPath := s.matchAdminPath(r.URL.Path, settings)
 	if adminPath != "" {
-		if s.isAdminSubscriptionPage(r.URL.Path, adminPath) {
-			s.renderAdminSubscriptionsPage(w, r, settings, adminPath)
-			return
-		}
 		s.renderAdminPage(w, r, settings, adminPath)
+		return
+	}
+	if target := s.legacyAdminRedirectTarget(r, settings); target != "" {
+		http.Redirect(w, r, target, http.StatusFound)
 		return
 	}
 	s.renderUserPage(w, r, settings)
 }
 
 func (s *Server) renderUserPage(w http.ResponseWriter, r *http.Request, settings map[string]string) {
-	data := map[string]any{
-		"Title":       pick(settings["app_name"], s.cfg.AppName),
-		"Description": pick(settings["app_description"], "Go + SQLite subscription management panel"),
-		"AdminPath":   "/" + normalizeAdminPath(firstNonEmpty(settings["secure_path"], s.cfg.AdminPath)),
-		"AppURL":      pick(settings["app_url"], s.cfg.AppURL),
-		"Version":     frontendVersion,
-		"CustomHTML":  template.HTML(settings["custom_html"]),
-		"WindowSettings": toTemplateJS(map[string]any{
-			"title":          pick(settings["app_name"], s.cfg.AppName),
-			"assets_path":    "/theme/Xboard/assets",
-			"theme":          map[string]any{"color": pick(settings["theme_color"], "default")},
-			"version":        frontendVersion,
-			"background_url": settings["background_url"],
-			"description":    pick(settings["app_description"], "Go + SQLite subscription management panel"),
-			"i18n":           []string{"zh-CN", "en-US", "ja-JP", "vi-VN", "ko-KR", "zh-TW", "fa-IR"},
-			"logo":           settings["logo"],
-		}),
-	}
-	s.renderTemplate(w, "index.html", data)
+	s.renderTemplate(w, "index.html", s.spaTemplateData(r, settings, "user", s.configuredAdminPath(settings)))
 }
 
 func (s *Server) renderAdminPage(w http.ResponseWriter, r *http.Request, settings map[string]string, adminPath string) {
-	normalizedAdminPath := "/" + normalizeAdminPath(adminPath)
-	data := map[string]any{
-		"Title":       pick(settings["app_name"], s.cfg.AppName),
-		"Description": pick(settings["app_description"], "Go + SQLite subscription management panel"),
-		"AdminPath":   normalizedAdminPath,
-		"AppURL":      pick(settings["app_url"], s.cfg.AppURL),
-		"Logo":        settings["logo"],
-		"Version":     frontendVersion,
-		"WindowSettings": toTemplateJS(map[string]any{
-			"base_url":        "/",
-			"title":           pick(settings["app_name"], s.cfg.AppName),
-			"version":         frontendVersion,
-			"logo":            settings["logo"],
-			"secure_path":     "",
-			"admin_path":      normalizedAdminPath,
-			"api_secure_path": normalizedAdminPath,
-		}),
-	}
-	s.renderTemplate(w, "admin.html", data)
-}
-
-func (s *Server) renderAdminSubscriptionsPage(w http.ResponseWriter, r *http.Request, settings map[string]string, adminPath string) {
-	normalizedAdminPath := "/" + normalizeAdminPath(adminPath)
-	data := map[string]any{
-		"Title":       pick(settings["app_name"], s.cfg.AppName),
-		"Description": pick(settings["app_description"], "Go + SQLite subscription management panel"),
-		"AdminPath":   normalizedAdminPath,
-		"AppURL":      pick(settings["app_url"], s.cfg.AppURL),
-		"Logo":        settings["logo"],
-		"Version":     frontendVersion,
-		"WindowSettings": toTemplateJS(map[string]any{
-			"base_url":        "/",
-			"title":           pick(settings["app_name"], s.cfg.AppName),
-			"version":         frontendVersion,
-			"logo":            settings["logo"],
-			"secure_path":     "",
-			"admin_path":      normalizedAdminPath,
-			"api_secure_path": normalizedAdminPath,
-		}),
-	}
-	s.renderTemplate(w, "admin-subscriptions.html", data)
+	s.renderTemplate(w, "admin.html", s.spaTemplateData(r, settings, "admin", normalizeAdminPath(adminPath)))
 }
 
 func (s *Server) matchAdminPath(path string, settings map[string]string) string {
@@ -101,22 +43,34 @@ func (s *Server) matchAdminPath(path string, settings map[string]string) string 
 	if segment == "" {
 		return ""
 	}
-	for _, candidate := range []string{
-		normalizeAdminPath(settings["secure_path"]),
-		normalizeAdminPath(s.cfg.AdminPath),
-		"admin",
-	} {
-		if candidate != "" && segment == candidate {
-			return segment
-		}
+	adminPath := s.configuredAdminPath(settings)
+	if segment == adminPath {
+		return adminPath
 	}
 	return ""
 }
 
-func (s *Server) isAdminSubscriptionPage(path, adminPath string) bool {
-	path = strings.Trim(strings.TrimSpace(path), "/")
-	adminPath = normalizeAdminPath(adminPath)
-	return path == adminPath+"/subscription-links"
+func (s *Server) legacyAdminRedirectTarget(r *http.Request, settings map[string]string) string {
+	segment := firstPathSegment(r.URL.Path)
+	if segment == "" {
+		return ""
+	}
+	current := s.configuredAdminPath(settings)
+	for _, alias := range []string{normalizeAdminPath(s.cfg.AdminPath), "admin"} {
+		if alias == "" || alias == current || segment != alias {
+			continue
+		}
+		tail := strings.TrimPrefix(r.URL.Path, "/"+segment)
+		target := "/" + current
+		if tail != "" {
+			target += tail
+		}
+		if rawQuery := strings.TrimSpace(r.URL.RawQuery); rawQuery != "" {
+			target += "?" + rawQuery
+		}
+		return target
+	}
+	return ""
 }
 
 func firstPathSegment(path string) string {
@@ -134,6 +88,73 @@ func normalizeAdminPath(value string) string {
 		return "admin"
 	}
 	return value
+}
+
+func (s *Server) configuredAdminPath(settings map[string]string) string {
+	candidate := normalizeAdminPath(firstNonEmpty(settings["secure_path"], s.cfg.AdminPath))
+	if !isValidAdminPath(candidate) {
+		return "admin"
+	}
+	return candidate
+}
+
+func isValidAdminPath(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	if isReservedAdminPath(value) {
+		return false
+	}
+	for _, ch := range value {
+		if ch >= 'a' && ch <= 'z' {
+			continue
+		}
+		if ch >= 'A' && ch <= 'Z' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			continue
+		}
+		if ch == '-' || ch == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isReservedAdminPath(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "api", "assets", "dashboard", "static", "sub", "theme":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) spaTemplateData(r *http.Request, settings map[string]string, page, adminPath string) map[string]any {
+	title := pick(settings["app_name"], s.cfg.AppName)
+	description := pick(settings["app_description"], "Go + SQLite subscription management panel")
+	appURL := firstNonEmpty(settings["app_url"], s.cfg.AppURL, origin(r))
+
+	data := map[string]any{
+		"Title":       title,
+		"Description": description,
+		"Version":     frontendVersion,
+		"Bootstrap": toTemplateJS(map[string]any{
+			"page":        page,
+			"title":       title,
+			"description": description,
+			"adminPath":   adminPath,
+			"apiBase":     "/api/v1",
+			"appUrl":      appURL,
+		}),
+	}
+	if page == "user" {
+		data["CustomHTML"] = template.HTML(settings["custom_html"])
+	}
+	return data
 }
 
 func (s *Server) registerUserLegacyRoutes(r chi.Router) {

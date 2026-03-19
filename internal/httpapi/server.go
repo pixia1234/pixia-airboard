@@ -89,14 +89,12 @@ func (s *Server) registerAPIV1Routes(api chi.Router) {
 	s.registerUserRoutes(api)
 	s.registerClientRoutes(api)
 	s.registerAgentRoutes(api)
-	s.registerAdminRootRoutes(api)
 	s.registerAdminVersionedRoutes(api)
 }
 
 func (s *Server) registerAPIV2Routes(api chi.Router) {
 	s.registerPublicRoutes(api)
 	s.registerUserCompatRoutes(api)
-	s.registerAdminRootRoutes(api)
 	s.registerAdminVersionedRoutes(api)
 }
 
@@ -185,13 +183,7 @@ func (s *Server) registerAgentRoutes(api chi.Router) {
 
 func (s *Server) registerAdminVersionedRoutes(api chi.Router) {
 	api.Route("/{adminPath}", func(r chi.Router) {
-		r.Use(s.adminMiddleware)
-		s.registerAdminRoutes(r)
-	})
-}
-
-func (s *Server) registerAdminRootRoutes(api chi.Router) {
-	api.Group(func(r chi.Router) {
+		r.Use(s.adminPathMiddleware)
 		r.Use(s.adminMiddleware)
 		s.registerAdminRoutes(r)
 	})
@@ -262,7 +254,7 @@ func (s *Server) renderIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderAdmin(w http.ResponseWriter, r *http.Request) {
 	settings, _ := s.store.AppSettings(r.Context())
-	s.renderAdminPage(w, r, settings, firstNonEmpty(s.matchAdminPath(r.URL.Path, settings), settings["secure_path"], s.cfg.AdminPath))
+	s.renderAdminPage(w, r, settings, s.configuredAdminPath(settings))
 }
 
 func (s *Server) renderTemplate(w http.ResponseWriter, name string, data map[string]any) {
@@ -1003,7 +995,12 @@ func (s *Server) adminConfigSave(w http.ResponseWriter, r *http.Request) {
 			settings[key] = ""
 		case string:
 			if key == "secure_path" {
-				settings[key] = normalizeAdminPath(value)
+				value = normalizeAdminPath(value)
+				if !isValidAdminPath(value) {
+					fail(w, http.StatusBadRequest, "secure_path 不合法", nil)
+					return
+				}
+				settings[key] = value
 				continue
 			}
 			settings[key] = strings.TrimSpace(value)
@@ -1549,6 +1546,21 @@ func (s *Server) userMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userContextKey, user)))
+	})
+}
+
+func (s *Server) adminPathMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		settings, err := s.store.AppSettings(r.Context())
+		if err != nil {
+			fail(w, http.StatusInternalServerError, "读取配置失败", nil)
+			return
+		}
+		if chi.URLParam(r, "adminPath") != s.configuredAdminPath(settings) {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

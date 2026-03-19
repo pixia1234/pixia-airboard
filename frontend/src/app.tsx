@@ -202,7 +202,7 @@ function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void verifySession(authData);
-  }, [authData, verifySession]);
+  }, [authData]);
 
   const login = async (email: string, password: string) => {
     const payload = await requestJSON<ApiEnvelope<{ auth_data: string }>>(
@@ -247,7 +247,7 @@ function SessionProvider({ children }: { children: ReactNode }) {
     login,
     register,
     logout,
-    refreshSession: async () => verifySession(authData),
+    refreshSession: async () => verifySession(readStoredAuth()),
   };
 
   return <SessionContext value={value}>{children}</SessionContext>;
@@ -298,7 +298,7 @@ function UserDashboardProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void loadOverview();
-  }, [authData, loadOverview]);
+  }, [authData]);
 
   return (
     <UserDashboardContext
@@ -373,6 +373,7 @@ function AdminRoot() {
         >
           <Route index element={<Navigate to="/overview" replace />} />
           <Route path="overview" element={<AdminOverviewPage />} />
+          <Route path="subscription-links" element={<Navigate to="/users" replace />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="plans" element={<AdminPlansPage />} />
           <Route path="servers" element={<AdminServersPage />} />
@@ -1225,7 +1226,7 @@ function AdminOverviewPage() {
 
   useEffect(() => {
     void loadStats();
-  }, [loadStats]);
+  }, []);
 
   return (
     <Space direction="vertical" size={18} style={{ width: "100%" }}>
@@ -1339,7 +1340,7 @@ function AdminUsersPage() {
 
   useEffect(() => {
     void loadUsers();
-  }, [loadUsers]);
+  }, []);
 
   const createUser = async (values: { email?: string; password?: string; plan_id?: number }) => {
     setSaving(true);
@@ -1657,7 +1658,7 @@ function AdminPlansPage() {
 
   useEffect(() => {
     void loadPlans();
-  }, [loadPlans]);
+  }, []);
 
   const savePlan = async (values: Partial<Plan>) => {
     setSaving(true);
@@ -1797,7 +1798,7 @@ function AdminServersPage() {
   useEffect(() => {
     form.setFieldsValue({ type: "vmess", port: 443, network: "ws" });
     void loadServers();
-  }, [form, loadServers]);
+  }, [form]);
 
   const saveServer = async (values: Partial<ServerNode> & { type?: string; tags?: string; plan_ids?: string }) => {
     if (!values.type) {
@@ -1954,7 +1955,7 @@ function AdminNoticesPage() {
 
   useEffect(() => {
     void loadNotices();
-  }, [loadNotices]);
+  }, []);
 
   const saveNotice = async (values: { title?: string; content?: string }) => {
     setSaving(true);
@@ -2054,7 +2055,7 @@ function AdminSettingsPage() {
 
   useEffect(() => {
     void loadSettings();
-  }, [loadSettings]);
+  }, []);
 
   const saveSettings = async (values: SettingsRecord) => {
     setSaving(true);
