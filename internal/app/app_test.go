@@ -154,12 +154,73 @@ func TestRedisFlushDoesNotInvalidateSessionOrQuickLogin(t *testing.T) {
 	}
 }
 
-func (s *testServer) loginAdmin(t *testing.T) string {
+func TestXrayRTrafficAcceptsFieldAliases(t *testing.T) {
+	srv := newTestServer(t, "")
+	adminAuth := srv.loginAdmin(t)
+
+	configResp := srv.get(t, "/api/v1/admin/config/fetch", adminAuth)
+	mustStatus(t, configResp, http.StatusOK)
+
+	var configPayload struct {
+		Data map[string]any `json:"data"`
+	}
+	decodeJSON(t, configResp, &configPayload)
+
+	serverToken, _ := configPayload.Data["server_token"].(string)
+	if serverToken == "" {
+		t.Fatalf("expected server_token in config response")
+	}
+
+	var userID int64
+	var userUUID string
+	var beforeU, beforeD int64
+	if err := srv.db.QueryRow(`SELECT id, uuid, u, d FROM users WHERE email = ?`, "demo@example.com").Scan(&userID, &userUUID, &beforeU, &beforeD); err != nil {
+		t.Fatalf("query demo user: %v", err)
+	}
+
+	trafficResp := srv.postJSON(
+		t,
+		"/api/v1/agent/xrayr/traffic?token="+url.QueryEscape(serverToken)+"&node_id=1",
+		"",
+		map[string]any{
+			"users": []map[string]any{
+				{"uid": userID, "up": 111, "down": 222},
+				{"uuid": userUUID, "upload": 333, "download": 444},
+			},
+		},
+	)
+	mustStatus(t, trafficResp, http.StatusOK)
+
+	var afterU, afterD int64
+	if err := srv.db.QueryRow(`SELECT u, d FROM users WHERE id = ?`, userID).Scan(&afterU, &afterD); err != nil {
+		t.Fatalf("query updated traffic: %v", err)
+	}
+	if afterU != beforeU+444 || afterD != beforeD+666 {
+		t.Fatalf("expected traffic to be updated via aliases, got u=%d d=%d from u=%d d=%d", afterU, afterD, beforeU, beforeD)
+	}
+
+	demoAuth := srv.login(t, "demo@example.com", "demo123456")
+	subscribeResp := srv.get(t, "/api/v1/user/getSubscribe", demoAuth)
+	mustStatus(t, subscribeResp, http.StatusOK)
+
+	var subscribePayload struct {
+		Data struct {
+			U int64 `json:"u"`
+			D int64 `json:"d"`
+		} `json:"data"`
+	}
+	decodeJSON(t, subscribeResp, &subscribePayload)
+	if subscribePayload.Data.U != afterU || subscribePayload.Data.D != afterD {
+		t.Fatalf("expected getSubscribe to expose updated traffic, got u=%d d=%d want u=%d d=%d", subscribePayload.Data.U, subscribePayload.Data.D, afterU, afterD)
+	}
+}
+
+func (s *testServer) login(t *testing.T, email, password string) string {
 	t.Helper()
 
 	resp := s.postJSON(t, "/api/v1/passport/auth/login", "", map[string]any{
-		"email":    s.cfg.DefaultEmail,
-		"password": s.cfg.DefaultPass,
+		"email":    email,
+		"password": password,
 	})
 	mustStatus(t, resp, http.StatusOK)
 
@@ -173,6 +234,11 @@ func (s *testServer) loginAdmin(t *testing.T) string {
 		t.Fatalf("expected auth_data in login response")
 	}
 	return payload.Data.AuthData
+}
+
+func (s *testServer) loginAdmin(t *testing.T) string {
+	t.Helper()
+	return s.login(t, s.cfg.DefaultEmail, s.cfg.DefaultPass)
 }
 
 func (s *testServer) countRows(t *testing.T, table string) int {

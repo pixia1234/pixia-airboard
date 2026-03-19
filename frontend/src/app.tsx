@@ -119,6 +119,20 @@ interface UserDashboardContextValue extends UserDashboardState {
 
 const UserDashboardContext = createContext<UserDashboardContextValue | null>(null);
 
+function quickLoginRedirectTarget(redirect: string) {
+  const value = redirect.trim();
+  if (!value) {
+    return "/dashboard";
+  }
+  if (/^https?:\/\//i.test(value)) {
+    return "/dashboard";
+  }
+  if (value.startsWith("/")) {
+    return value;
+  }
+  return `/${value.replace(/^\/+/, "")}`;
+}
+
 export default function App() {
   return (
     <ConfigProvider
@@ -141,6 +155,7 @@ export default function App() {
 
 function SessionProvider({ children }: { children: ReactNode }) {
   const [authData, setAuthData] = useState(readStoredAuth());
+  const [consumingQuickLogin, setConsumingQuickLogin] = useState(false);
   const [session, setSession] = useState<SessionState>({
     ready: false,
     checking: false,
@@ -152,6 +167,23 @@ function SessionProvider({ children }: { children: ReactNode }) {
     storeAuth(value);
     setAuthData(value);
   };
+
+  const consumeQuickLogin = useEffectEvent(async (verifyCode: string) => {
+    if (!verifyCode) {
+      return;
+    }
+    setConsumingQuickLogin(true);
+    try {
+      const payload = await requestJSON<ApiEnvelope<{ auth_data: string; redirect?: string }>>(
+        `${bootstrap.apiBase}/passport/auth/token2Login?verify=${encodeURIComponent(verifyCode)}`,
+      );
+      const data = unwrapData(payload);
+      applyAuth(data.auth_data);
+      window.location.replace(quickLoginRedirectTarget(data.redirect || ""));
+    } catch (_) {
+      window.location.replace(window.location.pathname);
+    }
+  });
 
   const verifySession = useEffectEvent(async (currentAuth: string) => {
     if (!currentAuth) {
@@ -204,6 +236,17 @@ function SessionProvider({ children }: { children: ReactNode }) {
     void verifySession(authData);
   }, [authData]);
 
+  useEffect(() => {
+    if (bootstrap.page !== "user") {
+      return;
+    }
+    const verifyCode = new URLSearchParams(window.location.search).get("verify");
+    if (!verifyCode) {
+      return;
+    }
+    void consumeQuickLogin(verifyCode);
+  }, []);
+
   const login = async (email: string, password: string) => {
     const payload = await requestJSON<ApiEnvelope<{ auth_data: string }>>(
       `${bootstrap.apiBase}/passport/auth/login`,
@@ -250,7 +293,11 @@ function SessionProvider({ children }: { children: ReactNode }) {
     refreshSession: async () => verifySession(readStoredAuth()),
   };
 
-  return <SessionContext value={value}>{children}</SessionContext>;
+  return (
+    <SessionContext value={value}>
+      {consumingQuickLogin ? <FullscreenLoading title="正在验证快捷登录" /> : children}
+    </SessionContext>
+  );
 }
 
 function useSession() {

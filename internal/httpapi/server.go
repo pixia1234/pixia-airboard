@@ -898,7 +898,7 @@ func (s *Server) serverUniProxyPush(w http.ResponseWriter, r *http.Request) {
 	}
 	items := decodeTrafficItems(raw)
 	for _, item := range items {
-		userID := item.Int64("user_id")
+		userID := payloadFirstInt64(item, "user_id", "uid", "id")
 		if userID == 0 {
 			if uuid := item.String("uuid"); uuid != "" {
 				users, _ := s.store.ListAllUsers(r.Context())
@@ -913,7 +913,9 @@ func (s *Server) serverUniProxyPush(w http.ResponseWriter, r *http.Request) {
 		if userID == 0 {
 			continue
 		}
-		_ = s.store.AddTrafficByUserID(r.Context(), userID, item.Int64("u"), item.Int64("d"))
+		upload := payloadFirstInt64(item, "u", "up", "upload")
+		download := payloadFirstInt64(item, "d", "down", "download")
+		_ = s.store.AddTrafficByUserID(r.Context(), userID, upload, download)
 	}
 	s.invalidateNodeUsersCache(r.Context())
 	success(w, true)
@@ -2372,4 +2374,13 @@ func decodeTrafficItems(raw []byte) []payload {
 	default:
 		return nil
 	}
+}
+
+func payloadFirstInt64(p payload, keys ...string) int64 {
+	for _, key := range keys {
+		if _, ok := p[key]; ok {
+			return p.Int64(key)
+		}
+	}
+	return 0
 }
