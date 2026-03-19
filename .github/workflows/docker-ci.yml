@@ -37,19 +37,30 @@ jobs:
 
       - name: Smoke test container
         run: |
+          set -euo pipefail
+
           docker run -d --name pixia-airboard-ci \
             -p 18080:8080 \
             -e AIRBOARD_APP_URL=http://127.0.0.1:18080 \
             -e AIRBOARD_JWT_SECRET=ci-secret \
             pixia-airboard:ci
 
-          trap 'docker logs pixia-airboard-ci; docker rm -f pixia-airboard-ci' EXIT
+          trap 'docker ps -a || true; docker logs pixia-airboard-ci || true; docker rm -f pixia-airboard-ci || true' EXIT
 
-          curl --retry 20 --retry-delay 1 --retry-connrefused -fsS \
-            http://127.0.0.1:18080/ >/dev/null
+          check_url() {
+            url="$1"
+            for attempt in $(seq 1 30); do
+              if curl -fsS "$url" >/dev/null; then
+                return 0
+              fi
+              sleep 1
+            done
+            echo "smoke check failed for $url"
+            return 1
+          }
 
-          curl --retry 20 --retry-delay 1 --retry-connrefused -fsS \
-            http://127.0.0.1:18080/api/v1/guest/plan/fetch >/dev/null
+          check_url http://127.0.0.1:18080/
+          check_url http://127.0.0.1:18080/api/v1/guest/plan/fetch
 
       - name: Validate publish configuration
         if: github.event_name != 'pull_request' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/'))
