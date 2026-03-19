@@ -1,0 +1,419 @@
+:root {
+  color-scheme: light;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  color: #102038;
+  background:
+    radial-gradient(circle at top left, rgba(52, 127, 250, 0.2), transparent 28%),
+    linear-gradient(180deg, #f7faff 0%, #eff4fb 54%, #edf2f9 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: transparent;
+}
+
+.landing-shell {
+  width: min(1440px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.7fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.panel-card.ant-card,
+.metric-card.ant-card,
+.subscription-card.ant-card,
+.notice-card.ant-card {
+  border: 1px solid rgba(12, 35, 71, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 18px 54px rgba(7, 28, 65, 0.08);
+}
+
+.panel-hero.ant-card {
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(5, 23, 51, 0.98) 0%, rgba(7, 38, 87, 0.95) 54%, rgba(16, 89, 186, 0.88) 100%);
+  color: #f8fbff;
+}
+
+.panel-hero .ant-card-body,
+.panel-card .ant-card-body {
+  padding: 24px;
+}
+
+.brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1182ff 0%, #023070 100%);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgba(17, 130, 255, 0.32);
+}
+
+.brand-mark.small {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+.brand-name.ant-typography,
+.sider-title {
+  display: block;
+  color: inherit;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.brand-subtitle.ant-typography,
+.sider-subtitle {
+  display: block;
+  color: rgba(241, 247, 255, 0.7);
+  font-size: 13px;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hero-tags .ant-tag {
+  margin-inline-end: 0;
+  padding-inline: 12px;
+  border-radius: 999px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #eff6ff;
+}
+
+.landing-hero .ant-typography,
+.landing-hero .ant-typography.ant-typography-secondary {
+  color: inherit;
+}
+
+.landing-hero p.ant-typography {
+  max-width: 60ch;
+  color: rgba(240, 247, 255, 0.8);
+}
+
+.hero-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.hero-feature-card.ant-card {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f6fbff;
+}
+
+.hero-feature-card .ant-card-body {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+}
+
+.hero-feature-card .ant-typography {
+  color: inherit;
+}
+
+.auth-panel-card {
+  position: sticky;
+  top: 20px;
+}
+
+.auth-card-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.auth-card-head .ant-typography {
+  margin: 0;
+}
+
+.mini-form-card.ant-card {
+  border-radius: 16px;
+  background: #f8fbff;
+  border-color: #dce7f4;
+}
+
+.plan-card.ant-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.plan-card.ant-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #1182ff 0%, #72b1ff 100%);
+}
+
+.plan-card.is-active.ant-card {
+  outline: 2px solid rgba(6, 101, 208, 0.2);
+}
+
+.plan-price {
+  font-size: 30px;
+  font-weight: 700;
+  color: #0d2a5a;
+}
+
+.panel-shell.ant-layout {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.panel-sider.ant-layout-sider {
+  position: sticky;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow: auto;
+  background: linear-gradient(180deg, #07152d 0%, #0c2045 100%);
+}
+
+.panel-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 18px 18px;
+  color: #f6fbff;
+}
+
+.sider-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 18px 18px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sider-profile.compact {
+  padding: 16px;
+}
+
+.sider-profile .ant-typography {
+  display: block;
+  color: #f6fbff;
+}
+
+.sider-profile .ant-typography-secondary {
+  color: rgba(246, 251, 255, 0.68);
+}
+
+.panel-sider .ant-menu {
+  background: transparent;
+  border-inline-end: 0;
+}
+
+.panel-sider .ant-menu-item,
+.panel-sider .ant-menu-submenu-title {
+  width: calc(100% - 16px);
+  margin-inline: 8px;
+  border-radius: 12px;
+}
+
+.sider-footer {
+  display: grid;
+  gap: 10px;
+  margin: 18px;
+}
+
+.sider-footer .ant-btn {
+  height: 40px;
+  border-radius: 12px;
+}
+
+.panel-header.ant-layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: auto;
+  line-height: normal;
+  padding: 24px 28px 10px;
+  background: transparent;
+}
+
+.panel-header .ant-typography {
+  margin: 0;
+}
+
+.header-kicker.ant-typography {
+  display: block;
+  color: #0665d0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.panel-content.ant-layout-content {
+  padding: 0 28px 28px;
+}
+
+.banner-card .ant-card-body {
+  padding: 24px;
+}
+
+.banner-grid {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.banner-side {
+  min-width: 200px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #f6faff;
+  border: 1px solid #dce7f4;
+}
+
+.metric-card .ant-card-body {
+  padding: 20px;
+}
+
+.subscription-card .ant-card-body,
+.notice-card .ant-card-body {
+  padding: 18px;
+}
+
+.subscription-code.ant-typography {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f6faff;
+  border: 1px solid #dce7f4;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.page-spin,
+.fullscreen-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-spin {
+  min-height: 160px;
+}
+
+.fullscreen-loading {
+  min-height: 100vh;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-row-between {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-head .ant-typography {
+  margin: 0;
+}
+
+.admin-login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 1200px) {
+  .landing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-panel-card {
+    position: static;
+  }
+}
+
+@media (max-width: 992px) {
+  .panel-sider.ant-layout-sider {
+    position: static;
+    height: auto;
+  }
+
+  .panel-header.ant-layout-header,
+  .panel-content.ant-layout-content,
+  .landing-shell {
+    width: min(100% - 20px, 1440px);
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .banner-grid,
+  .card-row-between {
+    flex-direction: column;
+  }
+
+  .panel-header.ant-layout-header {
+    padding-inline: 16px;
+  }
+
+  .panel-content.ant-layout-content {
+    padding-inline: 16px;
+  }
+}

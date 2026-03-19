@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{.Title}} - 订阅链接管理</title>
+  <meta name="description" content="{{.Description}}">
+  <script>
+    window.settings = {{.WindowSettings}};
+  </script>
+  <link rel="stylesheet" crossorigin href="/assets/admin/assets/index-DGuC9SzW.css?v={{.Version}}" />
+</head>
+<body class="bg-background text-foreground">
+  <div id="subscription-admin" class="min-h-screen">
+    <div class="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-6 md:px-6">
+      <header class="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-sm text-muted-foreground">Xboard Admin / Subscription URLs</p>
+          <h1 class="text-2xl font-semibold tracking-tight">订阅链接管理</h1>
+          <p class="mt-1 text-sm text-muted-foreground">管理员可为每个用户维护多个订阅后缀，并直接重置或禁用。</p>
+        </div>
+        <div class="flex gap-3">
+          <a id="back-to-admin" class="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground" href="{{.AdminPath}}">
+            返回面板
+          </a>
+        </div>
+      </header>
+
+      <section class="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div class="rounded-2xl border bg-card shadow-sm">
+          <div class="border-b p-4">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 class="text-lg font-medium">用户列表</h2>
+                <p class="text-sm text-muted-foreground">选择用户后，可在右侧维护订阅后缀。</p>
+              </div>
+              <input id="user-search" class="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm md:w-72" placeholder="搜索邮箱 / 订阅后缀" />
+            </div>
+          </div>
+          <div id="user-list" class="divide-y"></div>
+        </div>
+
+        <div class="rounded-2xl border bg-card shadow-sm">
+          <div id="subscription-detail" class="flex min-h-[520px] flex-col">
+            <div class="border-b p-4">
+              <h2 class="text-lg font-medium">订阅详情</h2>
+              <p class="text-sm text-muted-foreground">先从左侧选择一个用户。</p>
+            </div>
+            <div class="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+              暂未选择用户
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script src="/static/admin-subscriptions.js?v={{.Version}}"></script>
+</body>
+</html>

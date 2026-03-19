@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixia Airboard</title>
+    <script>
+      window.__AIRBOARD_BOOTSTRAP__ = window.__AIRBOARD_BOOTSTRAP__ || {
+        page: location.pathname.startsWith("/admin") ? "admin" : "user",
+        title: "Pixia Airboard",
+        description: "Subscription management panel",
+        adminPath: "admin",
+        apiBase: "/api/v1",
+        appUrl: location.origin,
+      };
+    </script>
+    <script type="module" crossorigin src="/static/spa/assets/app.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/spa/assets/app.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
